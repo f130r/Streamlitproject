@@ -88,7 +88,7 @@ def render_board_html(board, moves=None, total_size=600):
     return html
 
 # --- Streamlit UI ---
-st.title("オセロゲーム（盤面600px固定・デプロイ対応）")
+st.title("オセロゲーム ver2.0")
 
 if "board" not in st.session_state:
     st.session_state.board = init_board()
@@ -102,7 +102,7 @@ st.markdown(render_board_html(board, moves, total_size=600), unsafe_allow_html=T
 
 # 注意書き（中央・白文字）
 st.markdown(
-    '<div style="text-align:center; color:white; font-weight:bold; font-size:16px;">石を置くボタンは2回クリックしてください</div>',
+    '<div style="text-align:center; color:white; font-weight:bold; font-size:16px;">黒の石を置くマス番号を入力して石を置くボタンは2回クリックしてください</div>',
     unsafe_allow_html=True
 )
 
