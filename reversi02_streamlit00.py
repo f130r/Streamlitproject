@@ -61,24 +61,24 @@ def score(board):
     white = np.sum(board==-1)
     return black, white
 
-# --- HTML盤面描画（レスポンシブ版） ---
-def render_board_html(board, moves=None, max_size=800):
-    html = f'<div style="width:90vw; max-width:{max_size}px; margin:auto;">'
+# --- HTML盤面描画（600px固定版） ---
+def render_board_html(board, moves=None, total_size=600):
+    html = f'<div style="width:{total_size}px; margin:auto;">'
     html += '<table style="border-collapse: collapse; width:100%;">'
-    cell_size = 100 / 8  # %で指定
+    cell_size = total_size // 8
 
     for x in range(8):
         html += '<tr>'
         for y in range(8):
             cell_value = board[x,y]
-            style = f'width:{cell_size}%; padding-top:{cell_size}%; position:relative; border:2px solid black; background-color:green;'
+            style = f'width:{cell_size}px; height:{cell_size}px; text-align:center; vertical-align:middle; border:2px solid black; background-color:green; position:relative;'
             if moves and (x,y) in moves:
-                style += ' outline: 3px solid red;'
+                style += ' outline:3px solid red;'
             content = ''
             if cell_value == 1:
-                content = '<div style="position:absolute; top:10%; left:10%; width:80%; height:80%; border-radius:50%; background:black;"></div>'
+                content = f'<div style="width:{int(cell_size*0.65)}px; height:{int(cell_size*0.65)}px; border-radius:50%; background:black; margin:auto; position:relative; top:17.5%;"></div>'
             elif cell_value == -1:
-                content = '<div style="position:absolute; top:10%; left:10%; width:80%; height:80%; border-radius:50%; background:white; border:1px solid black;"></div>'
+                content = f'<div style="width:{int(cell_size*0.65)}px; height:{int(cell_size*0.65)}px; border-radius:50%; background:white; border:1px solid black; margin:auto; position:relative; top:17.5%;"></div>'
             else:
                 index = x*8+y
                 content = f'<div style="position:absolute; top:25%; left:25%; font-weight:bold; color:white;">{index}</div>'
@@ -88,7 +88,7 @@ def render_board_html(board, moves=None, max_size=800):
     return html
 
 # --- Streamlit UI ---
-st.title("オセロゲーム（レスポンシブ版）")
+st.title("オセロゲーム（盤面600px固定・デプロイ対応）")
 
 if "board" not in st.session_state:
     st.session_state.board = init_board()
@@ -98,11 +98,11 @@ player = 1
 moves = valid_moves(board, player)
 
 # 盤面描画
-st.markdown(render_board_html(board, moves), unsafe_allow_html=True)
+st.markdown(render_board_html(board, moves, total_size=600), unsafe_allow_html=True)
 
 # 注意書き（中央・白文字）
 st.markdown(
-    '<div style="text-align:center; color:white; font-weight:bold; font-size:16px;">黒の石を置くマス番号を入力して石を置くボタンは2回クリックしてください</div>',
+    '<div style="text-align:center; color:white; font-weight:bold; font-size:16px;">石を置くボタンは2回クリックしてください</div>',
     unsafe_allow_html=True
 )
 
