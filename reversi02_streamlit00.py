@@ -1,141 +1,137 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
-
-# --- 定数 ---
-EMPTY, BLACK, WHITE = 0, 1, -1
-SIZE = 8
-dirs = [(dx, dy) for dx in [-1,0,1] for dy in [-1,0,1] if not (dx==0 and dy==0)]
-
-# --- 初期化 ---
-if "board" not in st.session_state:
-    board = np.zeros((SIZE, SIZE), dtype=int)
-    board[3,3], board[4,4] = WHITE, WHITE
-    board[3,4], board[4,3] = BLACK, BLACK
-    st.session_state.board = board
-    st.session_state.turn = BLACK
-
-board = st.session_state.board
-turn = st.session_state.turn
+import random
 
 # --- ゲームロジック ---
-def inside(x,y):
-    return 0 <= x < SIZE and 0 <= y < SIZE
+def init_board():
+    board = np.zeros((8,8), dtype=int)
+    board[3,3] = board[4,4] = 1
+    board[3,4] = board[4,3] = -1
+    return board
 
-def valid_moves(board,color):
-    moves=[]
-    for y in range(SIZE):
-        for x in range(SIZE):
-            if board[y,x]!=EMPTY:
+DIRECTIONS = [(-1,-1), (-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0), (1,1)]
+
+def valid_moves(board, player):
+    moves = []
+    for x in range(8):
+        for y in range(8):
+            if board[x,y] != 0:
                 continue
-            for dx,dy in dirs:
-                nx,ny=x+dx,y+dy
-                found=False
-                while inside(nx,ny) and board[ny,nx]==-color:
-                    found=True
-                    nx+=dx
-                    ny+=dy
-                if found and inside(nx,ny) and board[ny, nx]==color:
-                    moves.append((x,y))
-                    break
-    return moves
+            for dx,dy in DIRECTIONS:
+                nx,ny = x+dx,y+dy
+                found_opponent = False
+                while 0<=nx<8 and 0<=ny<8:
+                    if board[nx,ny] == -player:
+                        found_opponent = True
+                    elif board[nx,ny] == player and found_opponent:
+                        moves.append((x,y))
+                        break
+                    else:
+                        break
+                    nx += dx
+                    ny += dy
+    return list(set(moves))
 
-def place_stone(board,x,y,color):
-    board[y,x] = color
-    for dx,dy in dirs:
+def place_stone(board, x, y, player):
+    board[x,y] = player
+    for dx,dy in DIRECTIONS:
         nx,ny = x+dx, y+dy
-        flips=[]
-        while inside(nx,ny) and board[ny,nx]==-color:
-            flips.append((nx,ny))
-            nx+=dx
-            ny+=dy
-        if inside(nx,ny) and board[ny,nx]==color:
-            for fx,fy in flips:
-                board[fy,fx] = color
+        stones_to_flip = []
+        while 0<=nx<8 and 0<=ny<8:
+            if board[nx,ny] == -player:
+                stones_to_flip.append((nx,ny))
+            elif board[nx,ny] == player:
+                for fx,fy in stones_to_flip:
+                    board[fx,fy] = player
+                break
+            else:
+                break
+            nx += dx
+            ny += dy
+    return board
 
-def ai_move(board,color):
-    moves = valid_moves(board,color)
-    if not moves:
-        return None
-    best=None
-    max_flips=-1
-    for x,y in moves:
-        temp=board.copy()
-        place_stone(temp,x,y,color)
-        flips=np.sum(temp==color)-np.sum(board==color)
-        if flips>max_flips:
-            max_flips=flips
-            best=(x,y)
-    return best
+def ai_move(board):
+    moves = valid_moves(board, -1)
+    if moves:
+        return random.choice(moves)
+    return None
 
-# --- 描画 ---
-def draw_board(board):
-    fig, ax = plt.subplots()
-    ax.set_xticks(range(SIZE+1))
-    ax.set_yticks(range(SIZE+1))
-    ax.grid(True, color='black', linewidth=1)
-    ax.set_facecolor('#2e7d32')  # 緑背景
+def score(board):
+    black = np.sum(board==1)
+    white = np.sum(board==-1)
+    return black, white
 
-    # 木目盤
-    brown_base = np.array([0.55,0.42,0.27])
-    for i in range(SIZE):
-        for j in range(SIZE):
-            variation = ((i+j)%2)*0.05
-            color = np.clip(brown_base + variation,0,1)
-            ax.add_patch(plt.Rectangle((i,j),1,1,color=color,zorder=0))
+# --- HTML/CSS 盤面描画（800px版） ---
+def render_board_html(board, moves=None, total_size=800):
+    html = '<table style="border-collapse: collapse; margin-left:auto; margin-right:auto;">'
+    cell_size = total_size // 8
+    stone_size = int(cell_size * 0.65)
 
-    # 石と番号
-    for y in range(SIZE):
-        for x in range(SIZE):
-            idx = (SIZE-1-y)*SIZE + x  # 上下反転して番号と一致
-            ax.text(x+0.5,SIZE-y-0.5,str(idx),color='white',ha='center',va='center',zorder=5,fontweight='bold')
-            if board[y,x]==BLACK:
-                ax.add_patch(plt.Circle((x+0.5,SIZE-y-0.5),0.4,facecolor='black',edgecolor='black',zorder=3))
-            elif board[y,x]==WHITE:
-                ax.add_patch(plt.Circle((x+0.5,SIZE-y-0.5),0.4,facecolor='white',edgecolor='black',linewidth=1,zorder=4))
-
-    ax.set_xlim(0,SIZE)
-    ax.set_ylim(0,SIZE)
-    ax.set_aspect('equal')
-    ax.set_title("黒：あなた　白：コンピュータ")
-    return fig
+    for x in range(8):
+        html += '<tr>'
+        for y in range(8):
+            cell_value = board[x,y]
+            style = f'width:{cell_size}px; height:{cell_size}px; text-align:center; vertical-align:middle; font-size:{cell_size//3}px; font-weight:bold;'
+            style += ' border:2px solid black; background-color:green;'
+            if moves and (x,y) in moves:
+                style += ' outline: 3px solid red;'
+            if cell_value == 1:
+                content = f'<div style="width:{stone_size}px; height:{stone_size}px; border-radius:50%; background:black; margin:auto;"></div>'
+            elif cell_value == -1:
+                content = f'<div style="width:{stone_size}px; height:{stone_size}px; border-radius:50%; background:white; margin:auto; border:1px solid black;"></div>'
+            else:
+                index = x*8+y
+                content = f'<span style="color:white;">{index}</span>'
+            html += f'<td style="{style}">{content}</td>'
+        html += '</tr>'
+    html += '</table>'
+    return html
 
 # --- Streamlit UI ---
-st.title("Streamlit オセロ（番号入力版）")
+st.title("オセロゲーム（改善版 800px・デプロイ対応）")
 
-moves = valid_moves(board, turn)
-st.write(f"有効手: [{', '.join(str((SIZE-1-y)*SIZE + x) for x,y in moves)}]")  # 有効手を番号で表示
+if "board" not in st.session_state:
+    st.session_state.board = init_board()
 
-# プレイヤー入力
-if turn == BLACK and moves:
-    st.subheader("あなたの手番：黒")
-    num = st.number_input("置くマス番号 (0-63)", min_value=0, max_value=63, step=1, key="num_input")
-    if st.button("石を置く"):
-        x, y = divmod(num, SIZE)
-        y = SIZE - 1 - y  # 上下反転
-        if (x,y) in moves:
-            place_stone(board, x, y, BLACK)
-            turn = WHITE
-            st.session_state.turn = turn
-        else:
-            st.warning("そこには置けません")
+board = st.session_state.board
+player = 1
+moves = valid_moves(board, player)
 
-# AIターン
-if turn == WHITE:
-    move = ai_move(board, WHITE)
-    if move:
-        x_ai, y_ai = move
-        place_stone(board, x_ai, y_ai, WHITE)
-    turn = BLACK
-    st.session_state.turn = turn
+# 盤面描画
+st.markdown(render_board_html(board, moves, total_size=800), unsafe_allow_html=True)
 
-# 描画
-fig = draw_board(board)
-st.pyplot(fig)
+# 注意書き（中央・白文字）
+st.markdown(
+    '<div style="text-align:center; color:white; font-weight:bold; font-size:16px;">石を置くボタンは2回クリックしてください</div>',
+    unsafe_allow_html=True
+)
 
-# 終了チェック
-black_count = np.sum(board==BLACK)
-white_count = np.sum(board==WHITE)
-st.write(f"黒: {black_count}  白: {white_count}")
-if black_count + white_count == SIZE*SIZE or (not valid_moves(board,BLACK) and not valid_moves(board,WHITE)):
-    st.write("ゲーム終了")
+# マス番号入力
+cell_number = st.number_input("置きたいマス番号(0-63)", min_value=0, max_value=63, value=0)
+if st.button("石を置く"):
+    x, y = divmod(cell_number, 8)
+    if (x,y) in moves:
+        board = place_stone(board, x, y, player)
+        ai = ai_move(board)
+        if ai:
+            board = place_stone(board, ai[0], ai[1], -player)
+    else:
+        st.warning("そこには置けません。")
+    st.session_state.board = board
+
+# スコア表示
+black, white = score(board)
+st.markdown(f"<div style='text-align:center;font-size:20px;'>プレイヤー(黒): {black} / AI(白): {white}</div>", unsafe_allow_html=True)
+
+# 勝敗判定
+if not valid_moves(board,1) and not valid_moves(board,-1):
+    if black > white:
+        st.success("プレイヤーの勝ち！")
+    elif white > black:
+        st.success("AIの勝ち！")
+    else:
+        st.info("引き分け！")
+
+# リセット
+if st.button("リセット"):
+    st.session_state.board = init_board()
